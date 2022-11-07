@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">ConditionalBottomNav</string>
+    <string name="home_catalog">Catalog</string>
+    <string name="home_profile">Profile</string>
+    <string name="home_search">Search</string>
+</resources>
