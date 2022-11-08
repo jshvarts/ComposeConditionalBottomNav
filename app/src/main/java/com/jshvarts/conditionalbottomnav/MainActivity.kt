@@ -3,31 +3,32 @@ package com.jshvarts.conditionalbottomnav
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.annotation.StringRes
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AccountCircle
-import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Search
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.colorResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.Lifecycle
-import androidx.navigation.*
+import androidx.navigation.NavBackStackEntry
+import androidx.navigation.NavDestination
+import androidx.navigation.NavGraph
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
-import com.jshvarts.conditionalbottomnav.MainDestinations.GAME_CARD_DETAIL_ROUTE
-import com.jshvarts.conditionalbottomnav.MainDestinations.HOME_ROUTE
+import com.google.accompanist.systemuicontroller.rememberSystemUiController
+import com.jshvarts.conditionalbottomnav.navigation.BottomBarTab
+import com.jshvarts.conditionalbottomnav.navigation.HOME_GRAPH
+import com.jshvarts.conditionalbottomnav.navigation.HomeDestinations.HOME_ITEM_ROUTE
+import com.jshvarts.conditionalbottomnav.navigation.navGraph
 import com.jshvarts.conditionalbottomnav.ui.theme.ConditionalBottomNavTheme
 
 class MainActivity : ComponentActivity() {
@@ -35,6 +36,16 @@ class MainActivity : ComponentActivity() {
     super.onCreate(savedInstanceState)
     setContent {
       ConditionalBottomNavTheme {
+        val systemUiController = rememberSystemUiController()
+        val useDarkIcons = !isSystemInDarkTheme()
+        DisposableEffect(systemUiController, useDarkIcons) {
+          systemUiController.setStatusBarColor(
+            color = Color.White,
+            darkIcons = useDarkIcons
+          )
+          onDispose {}
+        }
+
         // A surface container using the 'background' color from the theme
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colors.background) {
           App()
@@ -58,12 +69,16 @@ fun App() {
           )
         }
       }
-    ) {
+    ) { innerPaddingModifier ->
       NavHost(
         navController = appState.navController,
-        startDestination = MainDestinations.HOME_ROUTE
+        startDestination = HOME_GRAPH,
+        modifier = Modifier.padding(innerPaddingModifier)
       ) {
-        navGraph(appState.navController)
+        navGraph(
+          onHomeItemSelected = appState::navigateToHomeItemDetail,
+          upPress = appState::upPress
+        )
       }
     }
   }
@@ -76,48 +91,6 @@ fun rememberAppState(
   remember(navController) {
     AppState(navController)
   }
-
-fun NavGraphBuilder.navGraph(navController: NavController) {
-  navigation(
-    route = HOME_ROUTE,
-    startDestination = BottomBarTab.CATALOG.route
-  ) {
-    addHomeGraph(navController)
-  }
-}
-
-fun NavGraphBuilder.addHomeGraph(
-  navController: NavController,
-  modifier: Modifier = Modifier
-) {
-  composable(BottomBarTab.CATALOG.route) {
-    CatalogScreen(navController)
-  }
-  composable(BottomBarTab.PROFILE.route) {
-    ProfileScreen()
-  }
-  composable(BottomBarTab.SEARCH.route) {
-    SearchScreen()
-  }
-  composable(GAME_CARD_DETAIL_ROUTE) {
-    MyCard()
-  }
-}
-
-object MainDestinations {
-  const val HOME_ROUTE = "home"
-  const val GAME_CARD_DETAIL_ROUTE = "cardRoute"
-}
-
-enum class BottomBarTab(
-  @StringRes val title: Int,
-  val icon: ImageVector,
-  val route: String
-) {
-  CATALOG(R.string.home_catalog, Icons.Outlined.Home, "$HOME_ROUTE/catalog"),
-  PROFILE(R.string.home_profile, Icons.Outlined.AccountCircle, "$HOME_ROUTE/profile"),
-  SEARCH(R.string.home_search, Icons.Outlined.Search, "$HOME_ROUTE/search")
-}
 
 @Stable
 class AppState(
@@ -148,6 +121,13 @@ class AppState(
       }
     }
   }
+
+  fun navigateToHomeItemDetail(itemId: Int, from: NavBackStackEntry) {
+    // In order to discard duplicated navigation events, we check the Lifecycle
+    if (from.lifecycleIsResumed()) {
+      navController.navigate("${HOME_ITEM_ROUTE}/$itemId")
+    }
+  }
 }
 
 private fun NavBackStackEntry.lifecycleIsResumed() =
@@ -164,67 +144,23 @@ private tailrec fun findStartDestination(graph: NavDestination): NavDestination 
 fun BottomBar(
   tabs: Array<BottomBarTab>,
   currentRoute: String,
-  navigateToRoute: (String) -> Unit,
-  color: Color = Color.White,
-  contentColor: Color = Color.Black
+  navigateToRoute: (String) -> Unit
 ) {
-//  val routes = remember { tabs.map { it.route } }
-//  val currentSection = tabs.first { it.route == currentRoute }
-  Surface(
-    color = color,
-    contentColor = contentColor
+  BottomNavigation(
+    backgroundColor = colorResource(id = R.color.white)
   ) {
-    BottomNavigation {
-      tabs.forEach { item ->
-        BottomNavigationItem(
-          icon = {
-            Icon(
-              imageVector = item.icon,
-              contentDescription = stringResource(id = item.title)
-            )
-          },
-          label = { Text(text = stringResource(id = item.title)) },
-          selected = currentRoute == item.route,
-          onClick = { navigateToRoute(item.route) }
-        )
-      }
+    tabs.forEach { item ->
+      BottomNavigationItem(
+        icon = {
+          Icon(
+            painter = painterResource(id = item.icon),
+            contentDescription = stringResource(id = item.title)
+          )
+        },
+        label = { Text(text = stringResource(id = item.title)) },
+        selected = currentRoute == item.route,
+        onClick = { navigateToRoute(item.route) }
+      )
     }
-  }
-}
-
-@Composable
-fun CatalogScreen(navController: NavController) {
-  Text(
-    text = "catalog",
-    modifier = Modifier
-      .clickable {
-        navController.navigate(GAME_CARD_DETAIL_ROUTE)
-      })
-}
-
-@Composable
-fun ProfileScreen() {
-  Text("profile")
-}
-
-@Composable
-fun SearchScreen() {
-  Text("search")
-}
-
-@Composable
-fun MyCard() {
-  Text("my card")
-}
-
-@Preview
-@Composable
-private fun bottomNavPreview() {
-  ConditionalBottomNavTheme {
-    BottomBar(
-      tabs = BottomBarTab.values(),
-      currentRoute = "home/catalog",
-      navigateToRoute = { }
-    )
   }
 }
