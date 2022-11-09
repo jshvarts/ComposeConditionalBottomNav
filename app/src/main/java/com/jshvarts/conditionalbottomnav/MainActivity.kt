@@ -5,7 +5,6 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material.*
@@ -39,22 +38,16 @@ class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     setContent {
-      ConditionalBottomNavTheme {
-        val systemUiController = rememberSystemUiController()
-        val useDarkIcons = !isSystemInDarkTheme()
-        DisposableEffect(systemUiController, useDarkIcons) {
-          systemUiController.setStatusBarColor(
-            color = Color.White,
-            darkIcons = useDarkIcons
-          )
-          onDispose {}
-        }
-
-        // A surface container using the 'background' color from the theme
-        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colors.background) {
-          App()
-        }
+      val systemUiController = rememberSystemUiController()
+      val useDarkIcons = !isSystemInDarkTheme()
+      DisposableEffect(systemUiController, useDarkIcons) {
+        systemUiController.setStatusBarColor(
+          color = Color.White,
+          darkIcons = useDarkIcons
+        )
+        onDispose {}
       }
+      App()
     }
   }
 }
@@ -62,26 +55,26 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun App() {
   ConditionalBottomNavTheme {
-val appState = rememberAppState()
-Scaffold(
-  bottomBar = {
-    if (appState.shouldShowBottomBar) {
-      BottomBar(
-        tabs = appState.bottomBarTabs,
-        currentRoute = appState.currentRoute!!,
-        navigateToRoute = appState::navigateToBottomBarRoute
-      )
-    }
-  },
-  snackbarHost = {
-    SnackbarHost(
-      hostState = it,
-      modifier = Modifier.systemBarsPadding(),
-      snackbar = { snackbarData -> Snackbar(snackbarData) }
-    )
-  },
-  scaffoldState = appState.scaffoldState
-) { innerPaddingModifier ->
+    val appState = rememberAppState()
+    Scaffold(
+      bottomBar = {
+        if (appState.shouldShowBottomBar) {
+          BottomBar(
+            tabs = appState.bottomBarTabs,
+            currentRoute = appState.currentRoute!!,
+            navigateToRoute = appState::navigateToBottomBarRoute
+          )
+        }
+      },
+      snackbarHost = {
+        SnackbarHost(
+          hostState = it,
+          modifier = Modifier.systemBarsPadding(),
+          snackbar = { snackbarData -> Snackbar(snackbarData) }
+        )
+      },
+      scaffoldState = appState.scaffoldState
+    ) { innerPaddingModifier ->
       NavHost(
         navController = appState.navController,
         startDestination = HOME_GRAPH,
