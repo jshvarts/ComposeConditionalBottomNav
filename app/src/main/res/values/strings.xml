@@ -5,4 +5,5 @@
     <string name="chat">Chat</string>
     <string name="item_detail">Item Detail</string>
     <string name="close">Close</string>
+    <string name="item_lookup_failed_error">Item lookup failed</string>
 </resources>

@@ -1,18 +1,19 @@
 package com.jshvarts.conditionalbottomnav
 
+import android.content.res.Resources
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.Stable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -25,11 +26,14 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
+import com.jshvarts.conditionalbottomnav.model.SnackbarManager
 import com.jshvarts.conditionalbottomnav.navigation.BottomBarTab
 import com.jshvarts.conditionalbottomnav.navigation.HOME_GRAPH
 import com.jshvarts.conditionalbottomnav.navigation.HomeDestinations.HOME_ITEM_ROUTE
 import com.jshvarts.conditionalbottomnav.navigation.navGraph
 import com.jshvarts.conditionalbottomnav.ui.theme.ConditionalBottomNavTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -58,18 +62,26 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun App() {
   ConditionalBottomNavTheme {
-    val appState = rememberAppState()
-    Scaffold(
-      bottomBar = {
-        if (appState.shouldShowBottomBar) {
-          BottomBar(
-            tabs = appState.bottomBarTabs,
-            currentRoute = appState.currentRoute!!,
-            navigateToRoute = appState::navigateToBottomBarRoute
-          )
-        }
-      }
-    ) { innerPaddingModifier ->
+val appState = rememberAppState()
+Scaffold(
+  bottomBar = {
+    if (appState.shouldShowBottomBar) {
+      BottomBar(
+        tabs = appState.bottomBarTabs,
+        currentRoute = appState.currentRoute!!,
+        navigateToRoute = appState::navigateToBottomBarRoute
+      )
+    }
+  },
+  snackbarHost = {
+    SnackbarHost(
+      hostState = it,
+      modifier = Modifier.systemBarsPadding(),
+      snackbar = { snackbarData -> Snackbar(snackbarData) }
+    )
+  },
+  scaffoldState = appState.scaffoldState
+) { innerPaddingModifier ->
       NavHost(
         navController = appState.navController,
         startDestination = HOME_GRAPH,
@@ -86,16 +98,45 @@ fun App() {
 
 @Composable
 fun rememberAppState(
-  navController: NavHostController = rememberNavController()
+  scaffoldState: ScaffoldState = rememberScaffoldState(),
+  navController: NavHostController = rememberNavController(),
+  snackbarManager: SnackbarManager = SnackbarManager,
+  resources: Resources = resources(),
+  coroutineScope: CoroutineScope = rememberCoroutineScope()
 ) =
-  remember(navController) {
-    AppState(navController)
+  remember(scaffoldState, navController, snackbarManager, resources, coroutineScope) {
+    AppState(scaffoldState, navController, snackbarManager, resources, coroutineScope)
   }
 
 @Stable
 class AppState(
-  val navController: NavHostController
+  val scaffoldState: ScaffoldState,
+  val navController: NavHostController,
+  private val snackbarManager: SnackbarManager,
+  private val resources: Resources,
+  coroutineScope: CoroutineScope
 ) {
+  // Process snackbars coming from SnackbarManager
+  init {
+    coroutineScope.launch {
+      snackbarManager.messages.collect { currentMessages ->
+        if (currentMessages.isNotEmpty()) {
+          val message = currentMessages[0]
+          val text = resources.getText(message.messageId)
+
+          // Display the snackbar on the screen. `showSnackbar` is a function
+          // that suspends until the snackbar disappears from the screen
+          scaffoldState.snackbarHostState.showSnackbar(text.toString())
+          // Once the snackbar is gone or dismissed, notify the SnackbarManager
+          snackbarManager.setMessageShown(message.id)
+        }
+      }
+    }
+  }
+
+  // ----------------------------------------------------------
+  // BottomBar state source of truth
+  // ----------------------------------------------------------
   val bottomBarTabs = BottomBarTab.values()
   private val bottomBarRoutes = bottomBarTabs.map { it.route }
 
@@ -138,6 +179,17 @@ private val NavGraph.startDestination: NavDestination?
 
 private tailrec fun findStartDestination(graph: NavDestination): NavDestination {
   return if (graph is NavGraph) findStartDestination(graph.startDestination!!) else graph
+}
+
+/**
+ * A composable function that returns the [Resources]. It will be recomposed when `Configuration`
+ * gets updated.
+ */
+@Composable
+@ReadOnlyComposable
+private fun resources(): Resources {
+  LocalConfiguration.current
+  return LocalContext.current.resources
 }
 
 @Composable

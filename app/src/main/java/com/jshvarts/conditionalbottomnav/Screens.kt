@@ -16,6 +16,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.jshvarts.conditionalbottomnav.model.SnackbarManager
+import kotlin.random.Random
 
 @Composable
 fun HomeScreen(
@@ -98,10 +100,14 @@ fun HomeItemDetailScreen(
         .padding(innerPaddingModifier)
         .fillMaxSize()
     ) {
-      Text(
-        text = "Home Item $itemId",
-        style = MaterialTheme.typography.h6
-      )
+      if (ifRandomlyFailed()) {
+        SnackbarManager.showMessage(R.string.item_lookup_failed_error)
+      } else {
+        Text(
+          text = "Home Item $itemId",
+          style = MaterialTheme.typography.h6
+        )
+      }
     }
   }
 }
@@ -128,3 +134,5 @@ fun HomeItemCard(
     )
   }
 }
+
+private fun ifRandomlyFailed() = Random.nextBoolean()
